@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ahorcado Técnico - Hardware</title>
+    <style>
+        :root {
+            --bg-color: #f5efe6;
+            --card-bg: #fffbf5;
+            --text-color: #3b2c2c;
+            --accent-color: #9e2a2b;
+            --accent-hover: #b83234;
+            --correct-color: #2b7a4b;
+            --incorrect-color: #9e2a2b;
+            --border-color: #d8c8b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 12px;
+        }
+
+        .game-container {
+            background-color: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px 12px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 10px 25px rgba(59, 44, 44, 0.15);
+            text-align: center;
+        }
+
+        header h1 {
+            color: var(--accent-color);
+            font-size: 1.6rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        header p {
+            color: #6b5b55;
+            font-size: 0.95rem;
+            margin-bottom: 15px;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            color: var(--text-color);
+        }
+
+        .canvas-container {
+            margin: 5px auto 10px auto;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 5px;
+            width: 160px;
+            height: 160px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            background-color: transparent;
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .hint-box {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent-color);
+            padding: 10px 12px;
+            border-radius: 6px;
+            margin: 12px 0;
+            font-size: 0.88rem;
+            color: var(--text-color);
+            text-align: left;
+            line-height: 1.35;
+        }
+
+        .word-display {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 18px 0;
+            font-size: 1.5rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .letter-box {
+            border-bottom: 3px solid var(--accent-color);
+            min-width: 24px;
+            height: 38px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-transform: uppercase;
+            color: var(--text-color);
+        }
+
+        .letter-box.space {
+            border-bottom: none;
+            width: 14px;
+        }
+
+        .keyboard-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 5px;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        .key-btn {
+            background-color: #eae0d5;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            width: 34px;
+            height: 42px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+            transition: background-color 0.15s, transform 0.1s;
+        }
+
+        .key-btn:active:not(:disabled) {
+            background-color: #ded0c0;
+            transform: scale(0.95);
+        }
+
+        .key-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.4;
+        }
+
+        .key-btn.correct {
+            background-color: var(--correct-color);
+            color: #fff;
+            border-color: var(--correct-color);
+            opacity: 1;
+        }
+
+        .key-btn.incorrect {
+            background-color: var(--incorrect-color);
+            color: #fff;
+            border-color: var(--incorrect-color);
+            opacity: 0.4;
+        }
+
+        .action-btn {
+            background-color: var(--accent-color);
+            color: #fffbf5;
+            border: none;
+            padding: 12px 24px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            touch-action: manipulation;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .action-btn:active {
+            transform: scale(0.98);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(59, 44, 44, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            padding: 15px;
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            border: 2px solid var(--border-color);
+            padding: 25px 18px;
+            border-radius: 12px;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .modal-content h2 {
+            font-size: 1.6rem;
+            margin-bottom: 12px;
+        }
+
+        .modal-content.win h2 {
+            color: var(--correct-color);
+        }
+
+        .modal-content.lose h2 {
+            color: var(--incorrect-color);
+        }
+
+        .prize-box {
+            background-color: var(--bg-color);
+            padding: 12px;
+            border-radius: 8px;
+            border: 2px dashed var(--accent-color);
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <header>
+            <h1>Ahorcado Técnico</h1>
+            <p>Apuntes y Componentes de Hardware</p>
+        </header>
+
+        <div class="stats-bar">
+            <div>Vidas: <span id="lives-count">2</span> / 2</div>
+            <div>Puntaje: <span id="score-count">0</span> / 30</div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="hangmanCanvas" width="160" height="160"></canvas>
+        </div>
+
+        <div class="hint-box">
+            <strong>Pista:</strong> <span id="hint-text">Cargando pista...</span>
+        </div>
+
+        <div id="wordDisplay" class="word-display"></div>
+
+        <div id="keyboard" class="keyboard-grid"></div>
+    </div>
+
+    <div id="resultModal" class="modal-overlay">
+        <div id="modalCard" class="modal-content">
+            <h2 id="modalTitle">¡Felicidades!</h2>
+            <p id="modalMessage" style="margin-bottom: 12px; font-size: 1rem;"></p>
+            <div id="modalExtra"></div>
+            <button class="action-btn" id="modalBtn" onclick="closeModalAndNext()">Continuar</button>
+        </div>
+    </div>
+
+    <script>
+        const wordsList = [
+            { word: 'PLACA MADRE', hint: 'Tarjeta principal que interconecta físicamente y gestiona la comunicación entre los componentes del hardware.' },
+            { word: 'MEMORIA RAM', hint: 'Almacena los datos de los programas que usamos en el momento (pestañas, documento, juego abierto).' },
+            { word: 'VOLATIL', hint: 'Característica de la RAM: todo lo guardado en ella se borra automáticamente al apagar o reiniciar.' },
+            { word: 'DISCO DURO', hint: 'Guarda de forma permanente todos los archivos y programas del sistema operativo.' },
+            { word: 'SSD', hint: 'Unidades de estado sólido que hoy en día reemplazaron a los antiguos discos HDD.' },
+            { word: 'FUENTE DE ALIMENTACION', hint: 'Toma la corriente alterna de la red eléctrica y la convierte en continua de voltajes seguros (12v, 5v y 3.3v).' },
+            { word: 'PROCESADOR', hint: 'El "cerebro" de la computadora que ejecuta instrucciones y procesa datos.' },
+            { word: 'TARJETA GRAFICA', hint: 'Procesa los datos visuales, imágenes, gráficos 3D y videos.' },
+            { word: 'COOLER', hint: 'Sistema de refrigeración (por aire o líquida) que evita que el procesador se sobrecaliente.' }
+        ];
+
+        const alphabet = 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'.split('');
+        let currentItem = {};
+        let guessedLetters = new Set();
+        let wrongAttempts = 0;
+        const maxAttempts = 6;
+        
+        let gameLives = 2;
+        let score = 0;
+
+        const canvas = document.getElementById('hangmanCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function initGame() {
+            wrongAttempts = 0;
+            guessedLetters.clear();
+
+            currentItem = wordsList[Math.floor(Math.random() * wordsList.length)];
+            document.getElementById('hint-text').innerText = currentItem.hint;
+
+            renderWord();
+            renderKeyboard();
+            drawHangman(0);
+        }
+
+        function renderWord() {
+            const container = document.getElementById('wordDisplay');
+            container.innerHTML = '';
+
+            const letters = currentItem.word.split('');
+            letters.forEach(char => {
+                const box = document.createElement('div');
+                if (char === ' ') {
+                    box.className = 'letter-box space';
+                } else {
+                    box.className = 'letter-box';
+                    if (guessedLetters.has(char)) {
+                        box.innerText = char;
+                    } else {
+                        box.innerText = '';
+                    }
+                }
+                container.appendChild(box);
+            });
+        }
+
+        function renderKeyboard() {
+            const keyboardContainer = document.getElementById('keyboard');
+            keyboardContainer.innerHTML = '';
+
+            alphabet.forEach(letter => {
+                const btn = document.createElement('button');
+                btn.className = 'key-btn';
+                btn.innerText = letter;
+                btn.id = `key-${letter}`;
+                
+                if (guessedLetters.has(letter)) {
+                    btn.disabled = true;
+                    if (currentItem.word.includes(letter)) {
+                        btn.classList.add('correct');
+                    } else {
+                        btn.classList.add('incorrect');
+                    }
+                }
+
+                btn.onclick = () => makeGuess(letter);
+                keyboardContainer.appendChild(btn);
+            });
+        }
+
+        function makeGuess(letter) {
+            if (guessedLetters.has(letter) || wrongAttempts >= maxAttempts) return;
+
+            guessedLetters.add(letter);
+
+            if (currentItem.word.includes(letter)) {
+                renderWord();
+                checkWin();
+            } else {
+                wrongAttempts++;
+                drawHangman(wrongAttempts);
+                checkLoseWord();
+            }
+
+            renderKeyboard();
+        }
+
+        function checkWin() {
+            const remainingLetters = currentItem.word
+                .replace(/\s/g, '')
+                .split('')
+                .filter(char => !guessedLetters.has(char));
+
+            if (remainingLetters.length === 0) {
+                score += 10;
+                document.getElementById('score-count').innerText = score;
+                
+                if (score >= 30) {
+                    showPrizeModal();
+                } else {
+                    showModal('win');
+                }
+            }
+        }
+
+        function checkLoseWord() {
+            if (wrongAttempts >= maxAttempts) {
+                gameLives--;
+                document.getElementById('lives-count').innerText = gameLives;
+
+                if (gameLives <= 0) {
+                    score = 0;
+                    document.getElementById('score-count').innerText = score;
+                    showModal('gameover');
+                } else {
+                    showModal('lostWord');
+                }
+            }
+        }
+
+        function showModal(type) {
+            const modal = document.getElementById('resultModal');
+            const card = document.getElementById('modalCard');
+            const title = document.getElementById('modalTitle');
+            const msg = document.getElementById('modalMessage');
+            const extra = document.getElementById('modalExtra');
+
+            if (type === 'win') {
+                card.className = 'modal-content win';
+                title.innerText = '¡Correcto!';
+                msg.innerText = `Adivinaste la palabra: ${currentItem.word}`;
+                extra.innerHTML = `<p style="color: #6b5b55; margin-bottom: 15px;">Ganaste 10 puntos. Llevas ${score}/30 puntos.</p>`;
+            } else if (type === 'lostWord') {
+                card.className = 'modal-content lose';
+                title.innerText = '¡Te ahorcaste!';
+                msg.innerText = `La palabra era: ${currentItem.word}`;
+                extra.innerHTML = `<p style="color: var(--incorrect-color); font-weight: bold; margin-bottom: 15px;">Te queda ${gameLives} vida(s).</p>`;
+            } else if (type === 'gameover') {
+                card.className = 'modal-content lose';
+                title.innerText = 'Juego Terminado';
+                msg.innerText = `Te quedaste sin vidas. La palabra era: ${currentItem.word}`;
+                extra.innerHTML = `<p style="color: var(--incorrect-color); font-weight: bold; margin-bottom: 15px;">Tus puntos volvieron a 0.</p>`;
+            }
+
+            modal.style.display = 'flex';
+        }
+
+        function showPrizeModal() {
+            const modal = document.getElementById('resultModal');
+            const card = document.getElementById('modalCard');
+            const title = document.getElementById('modalTitle');
+            const msg = document.getElementById('modalMessage');
+            const extra = document.getElementById('modalExtra');
+
+            card.className = 'modal-content win';
+            title.innerText = '¡Felicidades, Ganaste!';
+            msg.innerText = `Adivinaste la palabra final y alcanzaste los 30 puntos.`;
+            extra.innerHTML = `
+                <div class="prize-box">
+                    <p style="color: var(--accent-color); font-weight: bold; font-size: 1.1rem;">¡Te has ganado un premio!</p>
+                    <p style="font-size: 0.9rem; color: #6b5b55; margin-top: 6px;">Muestra esta pantalla al equipo de la mesa técnica para reclamarlo.</p>
+                </div>
+            `;
+
+            score = 0;
+            gameLives = 2;
+            document.getElementById('score-count').innerText = score;
+            document.getElementById('lives-count').innerText = gameLives;
+            modal.style.display = 'flex';
+        }
+
+        function closeModalAndNext() {
+            document.getElementById('resultModal').style.display = 'none';
+            if (gameLives <= 0) {
+                gameLives = 2;
+                document.getElementById('lives-count').innerText = gameLives;
+            }
+            initGame();
+        }
+
+        function drawHangman(step) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#9e2a2b';
+            ctx.lineWidth = 3;
+
+            ctx.beginPath();
+            ctx.moveTo(10, 145); ctx.lineTo(150, 145);
+            ctx.moveTo(35, 145); ctx.lineTo(35, 15);
+            ctx.lineTo(100, 15);
+            ctx.lineTo(100, 32);
+            ctx.stroke();
+
+            if (step < 1) return;
+            ctx.beginPath();
+            ctx.arc(100, 47, 14, 0, Math.PI * 2);
+            ctx.stroke();
+
+            if (step < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(100, 61); ctx.lineTo(100, 105);
+            ctx.stroke();
+
+            if (step < 3) return;
+            ctx.beginPath();
+            ctx.moveTo(100, 75); ctx.lineTo(78, 93);
+            ctx.stroke();
+
+            if (step < 4) return;
+            ctx.beginPath();
+            ctx.moveTo(100, 75); ctx.lineTo(122, 93);
+            ctx.stroke();
+
+            if (step < 5) return;
+            ctx.beginPath();
+            ctx.moveTo(100, 105); ctx.lineTo(78, 132);
+            ctx.stroke();
+
+            if (step < 6) return;
+            ctx.beginPath();
+            ctx.moveTo(100, 105); ctx.lineTo(122, 132);
+            ctx.stroke();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toUpperCase();
+            if (alphabet.includes(key)) {
+                makeGuess(key);
+            }
+        });
+
+        initGame();
+    </script>
+</body>
+</html>
