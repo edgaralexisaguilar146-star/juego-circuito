@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Circuit Escape: Hardware Runner</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pcb: {
+                            dark: '#05190e',
+                            base: '#0c2e1b',
+                            line: '#1ed760',
+                            gold: '#fbbf24',
+                            copper: '#d97706',
+                            neonBlue: '#00f0ff',
+                            neonPink: '#ff0055'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['Courier New', 'monospace', 'ui-monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            overflow: hidden;
+        }
+
+        .pcb-grid {
+            background-color: #051a0e;
+            background-image: 
+                radial-gradient(#1ed760 0.75px, transparent 0.75px),
+                linear-gradient(to right, rgba(30, 215, 96, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(30, 215, 96, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px, 15px 15px, 15px 15px;
+            background-position: 0 0, 7.5px 7.5px, 7.5px 7.5px;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px rgba(30, 215, 96, 0.7), 0 0 20px rgba(30, 215, 96, 0.4);
+        }
+
+        .glow-box {
+            box-shadow: 0 0 15px rgba(30, 215, 96, 0.3), inset 0 0 15px rgba(30, 215, 96, 0.15);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #05190e;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1ed760;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #fbbf24;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-mono pcb-grid text-emerald-400 select-none">
+
+    <!-- Header Navigation Bar -->
+    <header class="w-full max-w-4xl mx-auto px-4 py-2 flex items-center justify-between border-b border-emerald-800/60 bg-slate-950/80 backdrop-blur z-20">
+        <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-microchip text-emerald-400 text-xl animate-pulse"></i>
+            <h1 class="text-lg md:text-xl font-bold tracking-wider text-emerald-300 glow-text">HARDWARE RUNNER</h1>
+        </div>
+        <div class="flex items-center space-x-3 text-xs md:text-sm">
+            <button id="soundToggleBtn" class="px-3 py-1.5 rounded bg-emerald-950 border border-emerald-600 hover:bg-emerald-800 transition flex items-center space-x-1">
+                <i id="soundIcon" class="fa-solid fa-volume-high text-emerald-400"></i>
+                <span class="hidden sm:inline">Sonido</span>
+            </button>
+            <button id="galleryBtn" class="px-3 py-1.5 rounded bg-emerald-950 border border-emerald-600 hover:bg-emerald-800 transition flex items-center space-x-1">
+                <i class="fa-solid fa-book-bookmark text-amber-400"></i>
+                <span class="hidden sm:inline">Enciclopedia</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="flex-1 flex flex-col items-center justify-center relative p-2 md:p-4 overflow-hidden">
+        
+        <!-- Game Area Wrapper -->
+        <div id="gameContainer" class="relative w-full max-w-lg aspect-[3/4] bg-slate-950/90 rounded-xl border-2 border-emerald-500/80 glow-box overflow-hidden flex flex-col">
+            
+            <!-- HUD / Top Bar inside Canvas -->
+            <div id="hud" class="absolute top-0 left-0 right-0 p-3 flex justify-between items-center z-10 bg-gradient-to-b from-slate-950/90 to-transparent pointer-events-none">
+                <div>
+                    <div class="text-[10px] text-emerald-500 uppercase tracking-widest font-bold">PUNTOS</div>
+                    <div id="scoreDisplay" class="text-xl md:text-2xl font-bold text-emerald-300 font-mono">00000</div>
+                </div>
+                <div class="text-center">
+                    <div id="activePowerupDisplay" class="text-xs text-amber-400 font-bold uppercase transition-all duration-300 opacity-0 transform translate-y-[-5px]">
+                        <span id="powerupName">SIN POWERUP</span>
+                    </div>
+                    <div id="multiplierDisplay" class="text-xs text-cyan-400 font-semibold opacity-0">x2 MULTIPLICADOR</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[10px] text-amber-500 uppercase tracking-widest font-bold">MÁXIMA</div>
+                    <div id="highScoreDisplay" class="text-xl md:text-2xl font-bold text-amber-400 font-mono">00000</div>
+                </div>
+            </div>
+
+            <!-- Canvas Element -->
+            <canvas id="gameCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+
+            <!-- START SCREEN OVERLAY -->
+            <div id="startOverlay" class="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center z-20">
+                <div class="w-16 h-16 mb-4 rounded-full bg-emerald-950 border-2 border-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 animate-bounce">
+                    <i class="fa-solid fa-microchip text-3xl text-emerald-400"></i>
+                </div>
+                <h2 class="text-2xl md:text-3xl font-extrabold text-emerald-400 mb-2 tracking-wide glow-text">CIRCUIT ESCAPE</h2>
+                <p class="text-xs md:text-sm text-slate-300 max-w-xs mb-6">
+                    Controla el <span class="text-amber-400 font-bold">Nano-Chip</span>. Esquiva los 7 componentes fundamentales de hardware y junta Power-Ups.
+                </p>
+
+                <!-- Controls Guide -->
+                <div class="grid grid-cols-2 gap-3 w-full max-w-xs mb-6 text-left text-xs bg-slate-900/80 p-3 rounded-lg border border-emerald-900">
+                    <div class="flex items-center space-x-2">
+                        <span class="px-1.5 py-0.5 bg-emerald-950 border border-emerald-700 rounded text-emerald-300 font-bold">◄ ►</span>
+                        <span class="text-slate-400">Flechas / A-D</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="px-1.5 py-0.5 bg-emerald-950 border border-emerald-700 rounded text-emerald-300 font-bold">TÁCTIL</span>
+                        <span class="text-slate-400">Arrastrar dedo</span>
+                    </div>
+                </div>
+
+                <!-- Play Button -->
+                <button id="startBtn" class="w-full max-w-xs py-3 px-6 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg shadow-lg shadow-emerald-500/30 transition transform hover:scale-105 active:scale-95 text-base flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-play"></i>
+                    <span>¡JUGAR AHORA!</span>
+                </button>
+            </div>
+
+            <!-- PAUSE OVERLAY -->
+            <div id="pauseOverlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center z-20 hidden">
+                <i class="fa-solid fa-pause text-4xl text-amber-400 mb-3 animate-pulse"></i>
+                <h3 class="text-2xl font-bold text-amber-300 mb-2">SISTEMA EN PAUSA</h3>
+                <p class="text-xs text-slate-400 mb-6">El bus de datos está detenido momentáneamente.</p>
+                <div class="flex flex-col space-y-3 w-full max-w-xs">
+                    <button id="resumeBtn" class="py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-play"></i>
+                        <span>REANUDAR</span>
+                    </button>
+                    <button id="restartPauseBtn" class="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-700 font-bold rounded-lg transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        <span>REINICIAR</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- GAME OVER OVERLAY -->
+            <div id="gameOverOverlay" class="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center z-20 hidden">
+                <div class="w-16 h-16 mb-3 rounded-full bg-rose-950 border-2 border-rose-500 flex items-center justify-center shadow-lg shadow-rose-500/30">
+                    <i class="fa-solid fa-triangle-exclamation text-3xl text-rose-500"></i>
+                </div>
+                <h2 class="text-2xl md:text-3xl font-extrabold text-rose-500 mb-1 tracking-wide">CORTOCIRCUITO</h2>
+                <p id="causeOfDeath" class="text-xs text-rose-300 mb-4">Colisión con componente de Hardware</p>
+
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-lg w-full max-w-xs mb-6 grid grid-cols-2 gap-2 text-center">
+                    <div>
+                        <div class="text-[10px] text-slate-400 uppercase">PUNTOS</div>
+                        <div id="finalScore" class="text-xl font-bold text-emerald-300">00000</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-amber-500 uppercase">RÉCORD</div>
+                        <div id="finalHighScore" class="text-xl font-bold text-amber-400">00000</div>
+                    </div>
+                </div>
+
+                <button id="restartBtn" class="w-full max-w-xs py-3 px-6 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg shadow-lg shadow-emerald-500/30 transition transform hover:scale-105 active:scale-95 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>REINTENTAR</span>
+                </button>
+            </div>
+
+            <!-- Pause Button inside game -->
+            <button id="pauseGameBtn" class="absolute bottom-3 right-3 z-10 w-8 h-8 rounded bg-slate-900/80 border border-emerald-800 text-emerald-400 hover:text-white flex items-center justify-center text-xs">
+                <i class="fa-solid fa-pause"></i>
+            </button>
+        </div>
+
+        <!-- EXTERNAL HUD BANNER -->
+        <div id="obstacleBanner" class="w-full max-w-lg mt-2 bg-slate-900/95 border border-emerald-500/60 p-2.5 rounded-lg text-xs transition-all duration-300 opacity-30 flex items-center space-x-3 shadow-lg">
+            <div id="bannerIcon" class="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-emerald-950 rounded border border-emerald-600">
+                <i class="fa-solid fa-microchip text-emerald-400"></i>
+            </div>
+            <div class="flex-1 overflow-hidden text-left">
+                <div class="flex items-center space-x-2">
+                    <span class="text-[9px] uppercase px-1.5 py-0.2 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-bold">HARDWARE</span>
+                    <div id="bannerTitle" class="font-bold text-amber-300 truncate">Componente Detectado</div>
+                </div>
+                <div id="bannerDesc" class="text-slate-300 text-[11px] leading-tight line-clamp-1 mt-0.5">Esquiva el hardware para mantener el sistema optimizado.</div>
+            </div>
+        </div>
+
+        <!-- Mobile Touch Controls overlay bar under canvas -->
+        <div class="w-full max-w-lg mt-2 flex justify-between items-center text-xs text-slate-400 px-2 md:hidden">
+            <span><i class="fa-solid fa-hand-pointer mr-1"></i> Desliza para mover</span>
+            <span id="fpsCounter" class="font-mono text-emerald-600">60 FPS</span>
+        </div>
+    </main>
+
+    <!-- COMPONENT ENCYCLOPEDIA MODAL -->
+    <div id="galleryModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border-2 border-emerald-500/80 rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-emerald-800 bg-slate-950 flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-book-bookmark text-amber-400 text-lg"></i>
+                    <h3 class="text-lg font-bold text-emerald-300">ENCICLOPEDIA DE HARDWARE</h3>
+                </div>
+                <button id="closeGalleryBtn" class="text-slate-400 hover:text-rose-400 text-xl font-bold px-2">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Body / Component Cards -->
+            <div id="galleryContent" class="p-4 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Cards will be populated dynamically -->
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-3 border-t border-emerald-900 bg-slate-950 text-center text-xs text-slate-400">
+                Aprende el rol esencial de los 7 componentes principales de una PC.
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT GAME LOGIC -->
+    <script>
+        // --- 7 CORE HARDWARE COMPONENTS DEFINITION ---
+        const MOTHERBOARD_COMPONENTS = [
+            {
+                id: 'motherboard',
+                name: '1. Placa Madre (Motherboard)',
+                shortDesc: 'Es la "columna vertebral" del sistema.',
+                fullDesc: 'Es un circuito impreso donde se conectan e interconectan todos los demás componentes. Contiene el socket para el procesador, los zócalos de memoria RAM, las ranuras PCIe y los controladores para gestionar la comunicación entre todo el hardware.',
+                icon: 'fa-chess-board',
+                color: '#10b981',
+                symbol: 'MOB',
+                width: 58,
+                height: 54
+            },
+            {
+                id: 'cpu',
+                name: '2. Procesador (CPU)',
+                shortDesc: 'Es el "cerebro" de la computadora.',
+                fullDesc: 'Se encarga de ejecutar las instrucciones de los programas y procesar todos los datos e información que maneja el sistema operativo. Su rendimiento se mide principalmente en núcleos (cores), hilos (threads) y frecuencia de reloj (GHz).',
+                icon: 'fa-microchip',
+                color: '#38bdf8',
+                symbol: 'CPU',
+                width: 48,
+                height: 48
+            },
+            {
+                id: 'ram',
+                name: '3. Memoria RAM',
+                shortDesc: 'Memoria de trabajo de alta velocidad y almacenamiento temporal.',
+                fullDesc: 'Guarda los datos de las aplicaciones y sistemas que están activos en ese instante para que la CPU acceda a ellos de forma ultrarrápida. Al apagar la computadora, la información alojada en la RAM se borra.',
+                icon: 'fa-memory',
+                color: '#4ade80',
+                symbol: 'RAM',
+                width: 24,
+                height: 64
+            },
+            {
+                id: 'storage',
+                name: '4. Unidades de Almacenamiento (SSD / HDD)',
+                shortDesc: 'Guardan los datos de forma permanente.',
+                fullDesc: 'SSD (Unidad de Estado Sólido): Utiliza memoria flash (M.2 NVMe), siendo ultrarrápida para iniciar el sistema y programas.\nHDD (Disco Duro Mecánico): Utiliza platos magnéticos giratorios, ofreciendo mayor capacidad a menor precio.',
+                icon: 'fa-hard-drive',
+                color: '#f59e0b',
+                symbol: 'SSD/HDD',
+                width: 50,
+                height: 40
+            },
+            {
+                id: 'gpu',
+                name: '5. Tarjeta Gráfica / Placa de Video (GPU)',
+                shortDesc: 'Procesa datos visuales, imágenes, gráficos 3D y videos.',
+                fullDesc: 'Puede ser integrada (dentro del propio procesador) para tareas cotidianas o dedicada (una tarjeta independiente con su propia memoria VRAM) para edición de video, diseño gráfico, modelado 3D o videojuegos.',
+                icon: 'fa-tv',
+                color: '#a855f7',
+                symbol: 'GPU',
+                width: 66,
+                height: 38
+            },
+            {
+                id: 'psu',
+                name: '6. Fuente de Alimentación (PSU)',
+                shortDesc: 'Convierte CA en CC con voltajes estables (12V, 5V, 3.3V).',
+                fullDesc: 'Convierte la corriente alterna (AC) de la toma de pared en corriente continua (DC) a voltajes estables que requieren los componentes. Es indispensable para suministrar la energía necesaria a toda la máquina sin dañarla.',
+                icon: 'fa-plug',
+                color: '#f43f5e',
+                symbol: 'PSU',
+                width: 52,
+                height: 44
+            },
+            {
+                id: 'cooler',
+                name: '7. Sistema de Refrigeración (Cooler)',
+                shortDesc: 'Evita que el procesador se sobrecaliente.',
+                fullDesc: 'Mantiene las temperaturas bajo control al realizar tareas exigentes. Puede ser por aire (un disipador de aluminio/cobre con ventilador) o líquida (un circuito de líquido refrigerante con bomba y radiador).',
+                icon: 'fa-fan',
+                color: '#00f0ff',
+                symbol: 'COOL',
+                width: 50,
+                height: 50
+            }
+        ];
+
+        // --- POWER-UPS DEFINITIONS (KEPT EXACTLY AS REQUESTED) ---
+        const POWERUPS = [
+            {
+                type: 'thermal_paste',
+                name: 'Pasta Térmica',
+                color: '#00f0ff',
+                icon: 'fa-shield-halved',
+                duration: 6000,
+                desc: 'Escudo protector térmico contra colisiones.'
+            },
+            {
+                type: 'overclock',
+                name: 'Overclocking',
+                color: '#fbbf24',
+                icon: 'fa-gauge-high',
+                duration: 5000,
+                desc: 'Velocidad + Multiplicador de Puntos x2.'
+            },
+            {
+                type: 'cooler_blast',
+                name: 'Disipador Limpiador',
+                color: '#a7f3d0',
+                icon: 'fa-wind',
+                duration: 0,
+                desc: 'Limpia todos los obstáculos de la pantalla.'
+            }
+        ];
+
+        // --- WEB AUDIO API SYNTHESIZER ---
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+            }
+
+            play(type) {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    if (this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    if (type === 'dodge') {
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(300, now);
+                        osc.frequency.exponentialRampToValueAtTime(600, now + 0.08);
+                        gain.gain.setValueAtTime(0.1, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                        osc.start(now);
+                        osc.stop(now + 0.08);
+                    } else if (type === 'powerup') {
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(400, now);
+                        osc.frequency.setValueAtTime(600, now + 0.08);
+                        osc.frequency.setValueAtTime(880, now + 0.16);
+                        gain.gain.setValueAtTime(0.15, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                        osc.start(now);
+                        osc.stop(now + 0.3);
+                    } else if (type === 'hit') {
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(150, now);
+                        osc.frequency.exponentialRampToValueAtTime(40, now + 0.4);
+                        gain.gain.setValueAtTime(0.3, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                        osc.start(now);
+                        osc.stop(now + 0.4);
+                    } else if (type === 'blast') {
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(800, now);
+                        osc.frequency.exponentialRampToValueAtTime(100, now + 0.25);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                        osc.start(now);
+                        osc.stop(now + 0.25);
+                    }
+                } catch(e) {
+                    console.log('Audio playback error', e);
+                }
+            }
+        }
+
+        const sound = new SoundFX();
+
+        // --- GAME ENGINE & STATE ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = 'START';
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('hardware_runner_high_score') || '0');
+        let speedMultiplier = 1;
+        let lastSpawnTime = 0;
+        let spawnInterval = 1200; // ms
+        let lastPowerupSpawnTime = 0;
+        let powerupInterval = 9000; // ms
+        let animationFrameId = null;
+
+        // Player Chip Object
+        const player = {
+            x: 0,
+            y: 0,
+            width: 38,
+            height: 38,
+            speed: 6.5,
+            baseSpeed: 6.5,
+            dx: 0,
+            shieldActive: false,
+            overclockActive: false,
+            shieldTimer: null,
+            overclockTimer: null,
+            color: '#1ed760'
+        };
+
+        let obstacles = [];
+        let powerupItems = [];
+        let particles = [];
+
+        // Keys state
+        const keys = {
+            left: false,
+            right: false
+        };
+
+        // Screen resize handling
+        function resizeCanvas() {
+            const container = document.getElementById('gameContainer');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            
+            if (gameState === 'START') {
+                player.x = canvas.width / 2 - player.width / 2;
+                player.y = canvas.height - player.height - 25;
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- DRAWING FUNCTIONS ---
+        function drawPCBGridLines() {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(30, 215, 96, 0.08)';
+            ctx.lineWidth = 1.5;
+
+            const step = 40;
+            for (let x = 0; x < canvas.width; x += step) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += step) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawPlayer() {
+            ctx.save();
+            ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
+
+            // Thermal Paste Shield aura
+            if (player.shieldActive) {
+                ctx.beginPath();
+                ctx.arc(0, 0, player.width * 0.85, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 240, 255, 0.25)';
+                ctx.fill();
+                ctx.strokeStyle = '#00f0ff';
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+            }
+
+            // Overclocking aura
+            if (player.overclockActive) {
+                ctx.beginPath();
+                ctx.arc(0, 0, player.width * 0.75, 0, Math.PI * 2);
+                ctx.strokeStyle = '#fbbf24';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Chip Body
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
+
+            ctx.strokeStyle = player.overclockActive ? '#fbbf24' : '#1ed760';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-player.width / 2, -player.height / 2, player.width, player.height);
+
+            // Gold Pins around Chip
+            ctx.fillStyle = '#fbbf24';
+            const pinCount = 4;
+            const pinSize = 3;
+            for (let i = 0; i < pinCount; i++) {
+                const offset = -player.width / 2 + 6 + i * 8;
+                ctx.fillRect(offset, -player.height / 2 - pinSize, 4, pinSize);
+                ctx.fillRect(offset, player.height / 2, 4, pinSize);
+                ctx.fillRect(-player.width / 2 - pinSize, offset, pinSize, 4);
+                ctx.fillRect(player.width / 2, offset, pinSize, 4);
+            }
+
+            // Core die text/logo
+            ctx.fillStyle = player.shieldActive ? '#00f0ff' : '#1ed760';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('NANO', 0, -3);
+            ctx.fillText('CHIP', 0, 6);
+
+            ctx.restore();
+        }
+
+        // --- UNIQUE CANVAS VECTOR DRAWING FOR THE 7 COMPONENTS ---
+        function drawObstacle(obs) {
+            ctx.save();
+            ctx.translate(obs.x + obs.width / 2, obs.y + obs.height / 2);
+
+            const w = obs.width;
+            const h = obs.height;
+            const comp = obs.component;
+
+            // Outer Glow Halo
+            ctx.shadowColor = comp.color;
+            ctx.shadowBlur = 8;
+
+            switch(comp.id) {
+                case 'motherboard': {
+                    // 1. MOTHERBOARD: Green PCB with slots, socket, and traces
+                    ctx.fillStyle = '#064e3b';
+                    ctx.fillRect(-w/2, -h/2, w, h);
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(-w/2, -h/2, w, h);
+
+                    // CPU Socket representation
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(-w/4, -h/3, 16, 16);
+                    ctx.strokeStyle = '#fbbf24';
+                    ctx.strokeRect(-w/4, -h/3, 16, 16);
+
+                    // RAM Slots
+                    ctx.fillStyle = '#0284c7';
+                    ctx.fillRect(w/6, -h/3, 4, 24);
+                    ctx.fillRect(w/6 + 6, -h/3, 4, 24);
+
+                    // PCIe Slot
+                    ctx.fillStyle = '#c084fc';
+                    ctx.fillRect(-w/3, h/6, w * 0.65, 5);
+
+                    // Circuit Traces
+                    ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(-w/4 + 16, -h/3 + 8); ctx.lineTo(w/6, -h/3 + 8);
+                    ctx.moveTo(-w/4 + 8, -h/3 + 16); ctx.lineTo(-w/4 + 8, h/6);
+                    ctx.stroke();
+                    break;
+                }
+
+                case 'cpu': {
+                    // 2. CPU: Silicon IHS die with corner pin markers and metallic finish
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(-w/2, -h/2, w, h);
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(-w/2, -h/2, w, h);
+
+                    // IHS Metal Cover
+                    const lid = w - 12;
+                    const grad = ctx.createLinearGradient(-lid/2, -lid/2, lid/2, lid/2);
+                    grad.addColorStop(0, '#94a3b8');
+                    grad.addColorStop(0.5, '#e2e8f0');
+                    grad.addColorStop(1, '#475569');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(-lid/2, -lid/2, lid, lid);
+
+                    // Text mark
+                    ctx.fillStyle = '#0f172a';
+                    ctx.font = 'bold 9px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('CPU', 0, -3);
+                    ctx.fillText('3.8GHz', 0, 6);
+
+                    // Golden triangles at corners
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.beginPath();
+                    ctx.moveTo(-w/2, -h/2);
+                    ctx.lineTo(-w/2 + 6, -h/2);
+                    ctx.lineTo(-w/2, -h/2 + 6);
+                    ctx.fill();
+                    break;
+                }
+
+                case 'ram': {
+                    // 3. RAM MODULE: Vertical Stick with memory chips & gold pins
+                    ctx.fillStyle = '#15803d';
+                    ctx.fillRect(-w/2, -h/2, w, h);
+                    ctx.strokeStyle = '#4ade80';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(-w/2, -h/2, w, h);
+
+                    // Black Memory DRAM Chips
+                    ctx.fillStyle = '#020617';
+                    ctx.fillRect(-w/2 + 3, -h/2 + 6, w - 6, 12);
+                    ctx.fillRect(-w/2 + 3, -h/2 + 22, w - 6, 12);
+                    ctx.fillRect(-w/2 + 3, -h/2 + 38, w - 6, 12);
+
+                    // Bottom Gold Edge Pins
+                    ctx.fillStyle = '#fbbf24';
+                    for (let rx = -w/2 + 2; rx <= w/2 - 4; rx += 4) {
+                        ctx.fillRect(rx, h/2 - 5, 2.5, 5);
+                    }
+                    break;
+                }
+
+                case 'storage': {
+                    // 4. STORAGE (SSD/HDD): Hybrid disk & M.2 visual style
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(-w/2, -h/2, w, h);
+                    ctx.strokeStyle = '#f59e0b';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(-w/2, -h/2, w, h);
+
+                    // HDD Platter circle
+                    ctx.beginPath();
+                    ctx.arc(-w/4, 0, h/3, 0, Math.PI * 2);
+                    ctx.fillStyle = '#64748b';
+                    ctx.fill();
+                    ctx.strokeStyle = '#cbd5e1';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // SSD Flash Chip block
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(2, -h/3, w/2 - 4, h * 0.65);
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.font = '7px monospace';
+                    ctx.fillText('NVMe', w/4, 0);
+                    break;
+                }
+
+                case 'gpu': {
+                    // 5. GPU: Graphics Card with cooling fans and PCI bracket
+                    ctx.fillStyle = '#3b0764';
+                    ctx.fillRect(-w/2, -h/2, w, h);
+                    ctx.strokeStyle = '#a855f7';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(-w/2, -h/2, w, h);
+
+                    // Dual Cooling Fans
+                    const r = h / 3.2;
+                    ctx.fillStyle = '#0f172a';
+                    ctx.beginPath(); ctx.arc(-w/4, 0, r, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(w/4, 0, r, 0, Math.PI * 2); ctx.fill();
+
+                    // Fan Blades
+                    ctx.strokeStyle = '#a855f7';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(-w/4 - r + 2, 0); ctx.lineTo(-w/4 + r - 2, 0);
+                    ctx.moveTo(-w/4, -r + 2); ctx.lineTo(-w/4, r - 2);
+                    ctx.moveTo(w/4 - r + 2, 0); ctx.lineTo(w/4 + r - 2, 0);
+                    ctx.moveTo(w/4, -r + 2); ctx.lineTo(w/4, r - 2);
+                    ctx.stroke();
+
+                    // Left I/O Metallic Bracket
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.fillRect(-w/2 - 3, -h/2, 3, h);
+                    break;
+                }
+
+                case 'psu': {
+                    // 6. PSU: Power Supply Unit box with exhaust grill and switch
+                    ctx.fillStyle = '#1e1b4b';
+                    ctx.fillRect(-w/2, -h/2, w, h);
+                    ctx.strokeStyle = '#f43f5e';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(-w/2, -h/2, w, h);
+
+                    // Fan Mesh Grill Lines
+                    ctx.strokeStyle = '#475569';
+                    ctx.lineWidth = 1;
+                    for (let gx = -w/2 + 8; gx <= w/4; gx += 5) {
+                        ctx.beginPath();
+                        ctx.moveTo(gx, -h/2 + 6);
+                        ctx.lineTo(gx, h/2 - 6);
+                        ctx.stroke();
+                    }
+
+                    // Power Switch & Socket
+                    ctx.fillStyle = '#f43f5e';
+                    ctx.fillRect(w/4 + 3, -h/3, 8, 10); // Red Switch
+                    ctx.fillStyle = '#020617';
+                    ctx.fillRect(w/4 + 3, 2, 8, 12); // Plug Socket
+                    break;
+                }
+
+                case 'cooler': {
+                    // 7. COOLER: Heatsink with fan blades & cooling pipes
+                    const radius = w / 2;
+
+                    // Outer Frame
+                    ctx.beginPath();
+                    ctx.arc(0, 0, radius - 2, 0, Math.PI * 2);
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fill();
+                    ctx.strokeStyle = '#00f0ff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Fan Hub
+                    ctx.beginPath();
+                    ctx.arc(0, 0, radius / 3, 0, Math.PI * 2);
+                    ctx.fillStyle = '#00f0ff';
+                    ctx.fill();
+
+                    // Spinning Blades representation
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.lineWidth = 3;
+                    for (let a = 0; a < Math.PI * 2; a += Math.PI / 2) {
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(Math.cos(a) * (radius - 5), Math.sin(a) * (radius - 5));
+                        ctx.stroke();
+                    }
+                    break;
+                }
+            }
+
+            ctx.shadowBlur = 0;
+            ctx.restore();
+        }
+
+        function drawPowerup(p) {
+            ctx.save();
+            ctx.translate(p.x + p.width / 2, p.y + p.height / 2);
+
+            ctx.beginPath();
+            ctx.arc(0, 0, p.width / 2, 0, Math.PI * 2);
+            ctx.fillStyle = p.info.color + '33';
+            ctx.fill();
+            ctx.strokeStyle = p.info.color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = p.info.color;
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(p.info.type === 'thermal_paste' ? 'PASTE' : p.info.type === 'overclock' ? 'OC' : 'BLAST', 0, 0);
+
+            ctx.restore();
+        }
+
+        function drawParticles() {
+            particles.forEach((p, index) => {
+                ctx.save();
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.alpha;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+                ctx.restore();
+
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.02;
+
+                if (p.alpha <= 0) particles.splice(index, 1);
+            });
+        }
+
+        function createExplosion(x, y, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    size: Math.random() * 3 + 2,
+                    color: color,
+                    alpha: 1
+                });
+            }
+        }
+
+        // --- GAME UPDATE LOOP ---
+        function update(currentTime) {
+            if (gameState !== 'PLAYING') return;
+
+            // Player Movement Logic
+            if (keys.left && player.x > 0) {
+                player.x -= player.speed;
+            }
+            if (keys.right && player.x < canvas.width - player.width) {
+                player.x += player.speed;
+            }
+
+            // Spawn Obstacles
+            if (currentTime - lastSpawnTime > spawnInterval) {
+                spawnObstacle();
+                lastSpawnTime = currentTime;
+
+                if (spawnInterval > 450) spawnInterval -= 12;
+                speedMultiplier += 0.015;
+            }
+
+            // Spawn Power-Ups
+            if (currentTime - lastPowerupSpawnTime > powerupInterval) {
+                spawnPowerup();
+                lastPowerupSpawnTime = currentTime;
+            }
+
+            // Update Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                obs.y += obs.speed * speedMultiplier;
+
+                if (!obs.bannerShown && obs.y > canvas.height * 0.45 && obs.y < canvas.height * 0.65) {
+                    showComponentBanner(obs.component);
+                    obs.bannerShown = true;
+                }
+
+                if (checkCollision(player, obs)) {
+                    if (player.shieldActive) {
+                        createExplosion(obs.x + obs.width / 2, obs.y + obs.height / 2, '#00f0ff', 20);
+                        sound.play('blast');
+                        obstacles.splice(i, 1);
+                        player.shieldActive = false;
+                        clearTimeout(player.shieldTimer);
+                        updatePowerupHUD();
+                        continue;
+                    } else {
+                        sound.play('hit');
+                        createExplosion(player.x + player.width / 2, player.y + player.height / 2, '#f43f5e', 30);
+                        triggerGameOver(obs.component.name);
+                        return;
+                    }
+                }
+
+                if (obs.y > canvas.height) {
+                    obstacles.splice(i, 1);
+                    const points = player.overclockActive ? 20 : 10;
+                    score += points;
+                    updateHUD();
+                }
+            }
+
+            // Update Powerups
+            for (let i = powerupItems.length - 1; i >= 0; i--) {
+                const p = powerupItems[i];
+                p.y += p.speed;
+
+                if (checkCollision(player, p)) {
+                    sound.play('powerup');
+                    applyPowerup(p.info);
+                    createExplosion(p.x + p.width / 2, p.y + p.height / 2, p.info.color, 15);
+                    powerupItems.splice(i, 1);
+                    continue;
+                }
+
+                if (p.y > canvas.height) {
+                    powerupItems.splice(i, 1);
+                }
+            }
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawPCBGridLines();
+            particles.length > 0 && drawParticles();
+            powerupItems.forEach(drawPowerup);
+            obstacles.forEach(drawObstacle);
+            drawPlayer();
+        }
+
+        function gameLoop(currentTime) {
+            update(currentTime);
+            render();
+
+            if (gameState === 'PLAYING') {
+                animationFrameId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // --- SPAWN HELPERS ---
+        function spawnObstacle() {
+            const comp = MOTHERBOARD_COMPONENTS[Math.floor(Math.random() * MOTHERBOARD_COMPONENTS.length)];
+            const width = comp.width;
+            const height = comp.height;
+            const x = Math.random() * (canvas.width - width);
+
+            obstacles.push({
+                x: x,
+                y: -height,
+                width: width,
+                height: height,
+                speed: Math.random() * 1.5 + 2.5,
+                component: comp,
+                bannerShown: false
+            });
+        }
+
+        function spawnPowerup() {
+            const info = POWERUPS[Math.floor(Math.random() * POWERUPS.length)];
+            const size = 30;
+            const x = Math.random() * (canvas.width - size);
+
+            powerupItems.push({
+                x: x,
+                y: -size,
+                width: size,
+                height: size,
+                speed: 2,
+                info: info
+            });
+        }
+
+        function checkCollision(rect1, rect2) {
+            return (
+                rect1.x < rect2.x + rect2.width &&
+                rect1.x + rect1.width > rect2.x &&
+                rect1.y < rect2.y + rect2.height &&
+                rect1.y + rect1.height > rect2.y
+            );
+        }
+
+        // --- POWER-UP SYSTEM LOGIC (KEPT EXACTLY AS REQUESTED) ---
+        function applyPowerup(info) {
+            const powerupNameEl = document.getElementById('powerupName');
+            const activePowerupDisplay = document.getElementById('activePowerupDisplay');
+            const multiplierDisplay = document.getElementById('multiplierDisplay');
+
+            if (info.type === 'thermal_paste') {
+                player.shieldActive = true;
+                powerupNameEl.textContent = 'PASTA TÉRMICA (ESCUDO)';
+                powerupNameEl.style.color = info.color;
+                activePowerupDisplay.classList.remove('opacity-0');
+
+                clearTimeout(player.shieldTimer);
+                player.shieldTimer = setTimeout(() => {
+                    player.shieldActive = false;
+                    updatePowerupHUD();
+                }, info.duration);
+
+            } else if (info.type === 'overclock') {
+                player.overclockActive = true;
+                player.speed = player.baseSpeed * 1.45;
+                powerupNameEl.textContent = 'OVERCLOCKING (x2 PUNTOS)';
+                powerupNameEl.style.color = info.color;
+                activePowerupDisplay.classList.remove('opacity-0');
+                multiplierDisplay.classList.remove('opacity-0');
+
+                clearTimeout(player.overclockTimer);
+                player.overclockTimer = setTimeout(() => {
+                    player.overclockActive = false;
+                    player.speed = player.baseSpeed;
+                    updatePowerupHUD();
+                }, info.duration);
+
+            } else if (info.type === 'cooler_blast') {
+                sound.play('blast');
+                obstacles.forEach(obs => {
+                    createExplosion(obs.x + obs.width / 2, obs.y + obs.height / 2, '#a7f3d0', 12);
+                });
+                score += obstacles.length * 15;
+                obstacles = [];
+                updateHUD();
+            }
+        }
+
+        function updatePowerupHUD() {
+            const activePowerupDisplay = document.getElementById('activePowerupDisplay');
+            const multiplierDisplay = document.getElementById('multiplierDisplay');
+
+            if (!player.shieldActive && !player.overclockActive) {
+                activePowerupDisplay.classList.add('opacity-0');
+                multiplierDisplay.classList.add('opacity-0');
+            } else if (!player.overclockActive) {
+                multiplierDisplay.classList.add('opacity-0');
+            }
+        }
+
+        // --- UI & BANNER DISPLAY ---
+        let bannerTimeout = null;
+        function showComponentBanner(comp) {
+            const banner = document.getElementById('obstacleBanner');
+            const title = document.getElementById('bannerTitle');
+            const desc = document.getElementById('bannerDesc');
+            const icon = document.getElementById('bannerIcon');
+
+            title.textContent = comp.name;
+            title.style.color = comp.color;
+            desc.textContent = comp.shortDesc;
+            icon.innerHTML = `<i class="fa-solid ${comp.icon}" style="color: ${comp.color}"></i>`;
+
+            banner.classList.remove('opacity-30');
+            banner.classList.add('opacity-100', 'border-amber-400/80');
+
+            clearTimeout(bannerTimeout);
+            bannerTimeout = setTimeout(() => {
+                banner.classList.add('opacity-30');
+                banner.classList.remove('opacity-100', 'border-amber-400/80');
+            }, 2000);
+        }
+
+        function updateHUD() {
+            document.getElementById('scoreDisplay').textContent = String(score).padStart(5, '0');
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('hardware_runner_high_score', highScore);
+                document.getElementById('highScoreDisplay').textContent = String(highScore).padStart(5, '0');
+            }
+        }
+
+        // --- GAME CONTROLS & LIFECYCLE ---
+        function startGame() {
+            gameState = 'PLAYING';
+            score = 0;
+            speedMultiplier = 1;
+            spawnInterval = 1100;
+            obstacles = [];
+            powerupItems = [];
+            particles = [];
+
+            player.x = canvas.width / 2 - player.width / 2;
+            player.y = canvas.height - player.height - 25;
+            player.shieldActive = false;
+            player.overclockActive = false;
+            player.speed = player.baseSpeed;
+
+            document.getElementById('startOverlay').classList.add('hidden');
+            document.getElementById('gameOverOverlay').classList.add('hidden');
+            document.getElementById('pauseOverlay').classList.add('hidden');
+
+            updateHUD();
+            document.getElementById('highScoreDisplay').textContent = String(highScore).padStart(5, '0');
+
+            lastSpawnTime = performance.now();
+            lastPowerupSpawnTime = performance.now();
+
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function pauseGame() {
+            if (gameState !== 'PLAYING') return;
+            gameState = 'PAUSED';
+            document.getElementById('pauseOverlay').classList.remove('hidden');
+        }
+
+        function resumeGame() {
+            if (gameState !== 'PAUSED') return;
+            gameState = 'PLAYING';
+            document.getElementById('pauseOverlay').classList.add('hidden');
+            lastSpawnTime = performance.now();
+            lastPowerupSpawnTime = performance.now();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function triggerGameOver(cause) {
+            gameState = 'GAMEOVER';
+            document.getElementById('causeOfDeath').textContent = `Colisión fatal con: ${cause}`;
+            document.getElementById('finalScore').textContent = String(score).padStart(5, '0');
+            document.getElementById('finalHighScore').textContent = String(highScore).padStart(5, '0');
+            document.getElementById('gameOverOverlay').classList.remove('hidden');
+        }
+
+        // --- EVENT LISTENERS ---
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                keys.left = true;
+                sound.play('dodge');
+            }
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                keys.right = true;
+                sound.play('dodge');
+            }
+            if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+                if (gameState === 'PLAYING') pauseGame();
+                else if (gameState === 'PAUSED') resumeGame();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+        });
+
+        let isTouching = false;
+        let touchStartX = 0;
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                isTouching = true;
+                touchStartX = e.touches[0].clientX;
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isTouching || e.touches.length === 0) return;
+            const currentX = e.touches[0].clientX;
+            const deltaX = currentX - touchStartX;
+            player.x += deltaX * 1.2;
+
+            if (player.x < 0) player.x = 0;
+            if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+
+            touchStartX = currentX;
+        }, { passive: true });
+
+        canvas.addEventListener('touchend', () => {
+            isTouching = false;
+        });
+
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+        document.getElementById('restartPauseBtn').addEventListener('click', startGame);
+        document.getElementById('pauseGameBtn').addEventListener('click', pauseGame);
+        document.getElementById('resumeBtn').addEventListener('click', resumeGame);
+
+        document.getElementById('soundToggleBtn').addEventListener('click', () => {
+            sound.enabled = !sound.enabled;
+            const soundIcon = document.getElementById('soundIcon');
+            if (sound.enabled) {
+                soundIcon.className = 'fa-solid fa-volume-high text-emerald-400';
+            } else {
+                soundIcon.className = 'fa-solid fa-volume-xmark text-rose-400';
+            }
+        });
+
+        function populateGallery() {
+            const container = document.getElementById('galleryContent');
+            container.innerHTML = '';
+
+            MOTHERBOARD_COMPONENTS.forEach(comp => {
+                const card = document.createElement('div');
+                card.className = 'bg-slate-950 p-4 rounded-lg border border-emerald-900/80 flex flex-col justify-between hover:border-emerald-500/80 transition';
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-10 h-10 rounded bg-slate-900 border border-emerald-700 flex items-center justify-center text-lg" style="color: ${comp.color}">
+                                <i class="fa-solid ${comp.icon}"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-sm text-slate-100">${comp.name}</h4>
+                                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">CÓDIGO: ${comp.symbol}</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-300 leading-relaxed whitespace-pre-line">${comp.fullDesc}</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        const galleryModal = document.getElementById('galleryModal');
+        document.getElementById('galleryBtn').addEventListener('click', () => {
+            populateGallery();
+            if (gameState === 'PLAYING') pauseGame();
+            galleryModal.classList.remove('hidden');
+        });
+
+        document.getElementById('closeGalleryBtn').addEventListener('click', () => {
+            galleryModal.classList.add('hidden');
+        });
+
+        // Initialize on Load
+        window.onload = function() {
+            resizeCanvas();
+            document.getElementById('highScoreDisplay').textContent = String(highScore).padStart(5, '0');
+            render();
+        };
+    </script>
+</body>
+</html>
